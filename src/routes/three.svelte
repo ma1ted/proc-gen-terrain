@@ -9,6 +9,22 @@
     let canvas;
     let container;
 
+    function octaves(x, y, scale, time, octaves) {
+        let result = 0;
+        let max = 0;
+        let amp = 1;
+        let freq = 1;
+
+        for (let i = 0; i < octaves; i++) {
+            result += noise(x / scale * freq + time, y / scale * freq + time) * amp;
+            max += amp;
+            amp /= 2;
+            freq *= 2;
+        }
+
+        return result / max;
+    }
+
     onMount(() => {
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 1000);
@@ -23,18 +39,19 @@
 
 		const positions = [];
         const colours = [];
-        const sideLength = 100;
+        const sideLength = 50;
 	    const spread = 0.5;
         const noiseScale = 50;
-        const noiseIntensity = 5;
+        const noiseIntensity = 10;
 		for (let x = 0; x < sideLength; x++) {
 			for (let y = 0; y < sideLength; y++) {
                 positions.push(
                     (x - (sideLength / 2)) * spread,
-                    0, // noise(x / noiseScale, y / noiseScale) * noiseIntensity,
+                    0,
                     (y - (sideLength / 2)) * spread
                 );
-                colours.push(x / sideLength, y / sideLength, 0.5, 1);
+                // colours.push(x / sideLength, y / sideLength, 0.5, 1);
+                colours.push(0, 0, 0, 1);
             }
 		}
 
@@ -44,7 +61,7 @@
 		geometry.computeBoundingSphere();
 
 		const material = new THREE.PointsMaterial({
-			size: 0.15,
+			size: 0.1,
 			vertexColors: true,
 			transparent: true,
 		});
@@ -52,7 +69,7 @@
 		const points = new THREE.Points(geometry, material);
 		scene.add(points);
 
-        camera.position.set(0, 20, -25);
+        camera.position.set(0, 15, -15);
         camera.lookAt(0, 0, 0);
 
         function resizeCanvas(canvas, renderer, camera) {
@@ -64,46 +81,38 @@
 	    resizeCanvas(canvas, renderer, camera);
         window.addEventListener("resize", () => resizeCanvas(canvas, renderer, camera));
 
-        function octaves(x, y, scale, time, octaves) {
-            let result = 0;
-            let max = 0;
-            let amp = 1;
-            let freq = 1;
-
-            for (let i = 0; i < octaves; i++) {
-                result += noise(x / scale * freq + time, y / scale * freq + time) * amp;
-                max += amp;
-                amp /= 2;
-                freq *= 2;
-            }
-
-            return result / max;
-        }
-
         function animate() {
             requestAnimationFrame(animate);
 
             points.rotation.y += 0.0025;
 
-            for (let i = 1; i < positions.length; i+=3) {
-                const x = positions[i - 1];
-                const y = positions[i];
-                const z = positions[i + 1];
-                const time = performance.now() / 2500;
-                const scale = 50;
+            const time = performance.now();
 
-                positions[i] = octaves(x, z, scale, time, 8) * noiseIntensity;
+            for (let i = 0; i < (sideLength ** 2) * 4; i++) {
+                const x = positions[i];
+                const y = positions[i + 1];
+                const z = positions[i + 2];
+
+                if (i % 3 === 0 && i < (sideLength ** 2) * 3) {
+                    positions[i + 1] = octaves(x, z, noiseScale, time / 3000, 8) * noiseIntensity;
+                }
+
+                if (i % 4 === 0) {
+                    const y = positions[i / 4 * 3 + 1];
+
+                    // Generate an r, g and b value from a single hue value
+                    const hue = (y / noiseIntensity) * 0.5 + 0.5;
+                    const rgb = new THREE.Color(`hsl(${hue * 360}, 100%, 50%)`);
+
+                    colours[i] = rgb.r;
+                    colours[i + 1] = rgb.g;
+                    colours[i + 2] = rgb.b;
+                    
+                }
             }
 
-            // for (let i = 0; i < colours.length; i++) {
-            //     // Only update the y position
-            //     if (i % 4 !== 1) continue;
-
-            //     colours[i] = Math.sin(i / 1000 + Date.now() / 100);
-            // }
-
             geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-            // geometry.setAttribute("color", new THREE.Float32BufferAttribute(colours, 4));
+            geometry.setAttribute("color", new THREE.Float32BufferAttribute(colours, 4));
 
             stats.update();
             renderer.render(scene, camera);
